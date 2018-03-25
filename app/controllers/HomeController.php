@@ -18,5 +18,4 @@ class HomeController extends BaseController
         $article = Article::first();
         require dirname(__FILE__) . "/../views/home.php";
     }
-
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 require '../vendor/autoload.php';
 
+// Eloquent ORM
 $capsule = new Capsule();
 $capsule->addConnection(require '../config/database.php');
 $capsule->bootEloquent();

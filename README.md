@@ -173,8 +173,210 @@ composer dump-autoload
 刷新自动加载
 
 ## Model连接数据库
-我们创建一个Article Model，这个 Model 对应数据库一张表。
+我们创建一个Article Model，这个 Model 对应数据库一张表。此时我们先用mysql 命令行工具新建一个 `demo_database` 的数据库，里面有一张表 `articles` , 表的结构大致如下：
 
+```console
+mysql> desc articles;
++---------+--------------+------+-----+---------+----------------+
+| Field   | Type         | Null | Key | Default | Extra          |
++---------+--------------+------+-----+---------+----------------+
+| id      | int(11)      | NO   | PRI | NULL    | auto_increment |
+| title   | varchar(256) | YES  |     | NULL    |                |
+| content | varchar(256) | YES  |     | NULL    |                |
++---------+--------------+------+-----+---------+----------------+
+3 rows in set (0.00 sec)
+
+```
+我们再在表里面填入数据：
+```console
+mysql> select * from articles;
++----+--------+--------------+
+| id | title  | content      |
++----+--------+--------------+
+|  1 | hhhhh  | heheheheheh  |
+|  2 | hhhhh2 | heheheheh2eh |
++----+--------+--------------+
+2 rows in set (0.00 sec)
+```
+当然了，我们现在是直接通过 MySQL 的 insert 命令直接填入数据，后续我们可以通过我们的框架新建 model 。
+
+接下来我们要做的就是怎么在 Model 中连接数据库取到数据库里面的数据啦！ 本文使用的 php 7.1，我们使用 mysqli 来连接数据库查询数据：
+
+```php
+<?php
+
+namespace App\Models;
+
+class Article 
+{
+    public static function first()
+    {
+        //mysql_connect is deprecated
+        $mysqli = new \mysqli('localhost', 'root', 'w.x.c.123', 'demo_database');
+        if ($mysqli->connect_errno) {
+            echo "Failed to connect to Mysql: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error();
+        }
+        $mysqli->set_charset('utf-8');
+        $result = $mysqli->query("SELECT * FROM articles limit 0,1");
+
+        $article = $result->fetch_array();
+        if ($article) {
+            echo "<p>" . $article['title'] . "</p>";
+            echo "<p>" . $article['content'] . "</p>";
+        }
+        $mysqli->close();
+    }
+}
+```
+这么一来我们就可以在控制器里面使用 
+`
+    Article::first();
+`
+来查询 articles 表里面的第一条article数据，然后我们再通过 echo 返回给浏览器。
+
+```php
+<?php
+
+namespace App\Controllers;
+
+
+use App\Models\Article;
+
+class HomeController extends BaseController
+{
+    public function home()
+    {
+        Article::first();
+    }
+
+}
+```
+
+## View层
+看上面的代码，我们在 Article Model 中连续写了两条 echo 语句来格式化输出。如果后续我们的页面十分复杂的时候，我们把所有的格式化输出的代码都写在 Model 里面感觉是个灾难。我们应该把这些格式化输出的代码分离出来，这便是我们说的 MVC 层的 View 层。
+
+我们在 views 目录下新建 home.php: 
+```php
+<?php
+
+echo "<p>" . $article['title'] . "</p>";
+echo "<p>" . $article['content'] . "</p>";
+```
+ 我们再改写一下 Article.php，删除echo 那两行，直接 
+ ```php
+ return article;
+ ```
+ 然后我们在 HomeController 中指定要使用的 view：
+ ```php
+<?php
+
+ namespace App\Controllers;
+ 
+ 
+ use App\Models\Article;
+ 
+ class HomeController extends BaseController
+ {
+     public function home()
+     {
+         $article = Article::first();
+         require dirname(__FILE__) . "/../views/home.php";
+     }
+ }
+
+ ```
+我们这里的 view 层仅仅是用 PHP 拼接了 html，后续我们需要实现更加复杂的视图的时候，我们可以引入模版引擎。
+
+## ORM
+我们一路从一个空文件夹开始，打造一个自己的一个框架，感觉并没有写多少代码，唯一写了好几行代码感觉比较麻烦的就是连接数据库来查询数据了。我们我们有很多 Model，要实现 增删改查的话，我们岂不是要重复 连接，查询、插入、删除、更新，然后关闭连接？我们应该把这些功能分装一下。
+
+怎么封装？有其他人写好的包了，直接拿来用吧～  当然如果你想自己造轮子的话，也可以自己实现一下。
+
+我们这里使用 `illuminate/database`:
+```shell
+composer require illuminate/database
+```
+然后我们在 public/index.php 中引入：
+```php
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+require '../vendor/autoload.php';
+
+// Eloquent ORM
+$capsule = new Capsule();
+$capsule->addConnection(require '../config/database.php');
+$capsule->bootEloquent();
+
+//路由配置
+require '../routes/web.php';
+
+```
+我们在连接数据的时候，使用了 config/database.php 的数据库配置文件。
+```php
+<?php
+
+return [
+    'driver' => 'mysql',
+    'host' => 'localhost',
+    'database' => 'demo_database',
+    'username' => 'root',
+    'password' => 'secret',
+    'charset' => 'utf8',
+    'collation' => 'utf8_general_ci',
+    'prefix' => ''
+];
+```
+接下来我们就可以删掉 models/Article.php 文件中我们写的大部分代码，而仅仅需要继承Illuminate\Database\Eloquent\Model 来使用 Eloquent ORM 的功能：
+```php
+<?php
+/**
+ * Created by PhpStorm.
+ * User: W
+ * Date: 24/03/2018
+ * Time: 22:23
+ */
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+
+class Article extends Model
+{
+    public $timestamps = false;
+}
+
+```
+
+更多Eloquent ORM的功能，您也可以自己查阅文档。
+
+
+## 总结
+
+好了，我们一个 MVC 框架基本上就搭建完了，我们回头看一下整个框架目录结构，是不是跟 Laravel 有点像呢？
+```shell
+➜  myFirstFramework git:(master) ✗ tree
+.
+├── README.md
+├── app
+│   ├── controllers
+│   │   ├── BaseController.php
+│   │   └── HomeController.php
+│   ├── models
+│   │   └── Article.php
+│   └── views
+│       └── home.php
+├── composer.json
+├── composer.lock
+├── config
+│   └── database.php
+├── public
+│   └── index.php
+├── routes
+│   └── web.php
+└── vendor ...
+```
 
 ref: https://blog.csdn.net/luyaran/article/details/53836486
 
