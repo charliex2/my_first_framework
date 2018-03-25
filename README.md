@@ -110,7 +110,8 @@ Macaw::dispatch();
 我们访问 `http://localhost:8001/hello` 就能看到我们预期的 "hello world".
 
 
-### MVC
+## MVC
+
 上面我们仅仅实现了访问一个地址，返回一个字符串。下面我们来真正搭建MVC框架。MVC其实就是Model、View、Controller三个的简称。
 不管怎么样，我们先新建三个文件夹再说，即 `views`、`models`、`controllers`。
  
